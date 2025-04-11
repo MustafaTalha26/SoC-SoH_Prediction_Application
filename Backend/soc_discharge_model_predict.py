@@ -1,0 +1,56 @@
+import pandas as pd
+import numpy as np
+from keras import models, layers
+import joblib
+import numpy as np
+import pandas as pd
+
+SOC_DISCHARGE_DIM = 6
+
+def json2pandas(json_data):
+    discharge_data = []
+    for i, cycle in enumerate(json_data):
+        data_dict = cycle["data"]
+        try:
+            voltage = data_dict['Voltage_measured']
+            current = data_dict['Current_measured']
+            temperature = data_dict['Temperature_measured']
+            current_load = data_dict['Current_load']
+            voltage_load = data_dict['Voltage_load']
+            time_array = data_dict['Time']
+
+            for j in range(len(time_array)):
+                discharge_data.append({
+                    'time': time_array[j],
+                    'voltage_measured': voltage[j],
+                    'current_measured': current[j],
+                    'temperature_measured': temperature[j],
+                    'voltage_load': voltage_load[j],
+                    'current_load': current_load[j],
+                })
+
+        except Exception as e:
+            print(f"⚠️ Skipped a cycle due to error: {e}")
+            continue  # skip bad cycles
+
+    df = pd.DataFrame(discharge_data)
+    return df
+
+def preProcess(json_data):
+   X = json2pandas(json_data)
+   print(X)
+   scaler = joblib.load('data/soc_discharge_minmax_scaler.pkl')
+   X_scaled = scaler.transform(X)
+   X_scaled = pd.DataFrame(X_scaled, columns=X.columns)
+   print(X_scaled)
+   return X_scaled
+
+def getModel():
+    model = models.Sequential([
+        layers.InputLayer(input_shape=(SOC_DISCHARGE_DIM,)),
+        layers.Dense(128, activation='relu'),
+        layers.Dense(64, activation='relu'),
+        layers.Dense(32, activation='relu'),
+        layers.Dense(1)
+    ])
+    return model
